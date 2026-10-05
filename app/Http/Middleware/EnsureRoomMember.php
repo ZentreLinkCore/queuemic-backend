@@ -1,0 +1,64 @@
+<?php
+
+namespace App\Http\Middleware;
+
+use App\Models\Room;
+use App\Models\RoomMember;
+use Closure;
+use Illuminate\Http\Request;
+use Symfony\Component\HttpFoundation\Response;
+
+class EnsureRoomMember
+{
+    public function handle(Request $request, Closure $next): Response
+    {
+        $roomCode = $request->route('code') ?? $request->input('room_code');
+
+        if (!$roomCode) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Room code is required.',
+                'code' => 'ROOM_CODE_REQUIRED',
+            ], 400);
+        }
+
+        $room = Room::where('code', strtoupper($roomCode))->where('status', 'active')->first();
+
+        if (!$room) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Room not found or has been closed.',
+                'code' => 'ROOM_NOT_FOUND',
+            ], 404);
+        }
+
+        $token = $request->bearerToken() ?? $request->header('X-Session-Token');
+
+        if (!$token) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Authentication token required.',
+                'code' => 'UNAUTHENTICATED',
+            ], 401);
+        }
+
+        $tokenHash = hash('sha256', $token);
+        $member = RoomMember::where('session_token_hash', $tokenHash)
+            ->where('room_id', $room->id)
+            ->first();
+
+        if (!$member) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Invalid session or member not in this room.',
+                'code' => 'INVALID_SESSION',
+            ], 403);
+        }
+
+        // Attach resolved room and member to request attributes
+        $request->attributes->set('room', $room);
+        $request->attributes->set('member', $member);
+
+        return $next($request);
+    }
+}
