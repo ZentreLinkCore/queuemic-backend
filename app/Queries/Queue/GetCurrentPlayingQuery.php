@@ -24,6 +24,8 @@ class GetCurrentPlayingQuery
             return null;
         }
 
+        $playback = \App\Models\PlaybackSession::where('room_id', $room->id)->first();
+
         return [
             'id' => $item->id,
             'room_id' => $item->room_id,
@@ -33,6 +35,10 @@ class GetCurrentPlayingQuery
             'position' => $item->position,
             'status' => $item->status,
             'played_at' => $item->played_at?->toISOString(),
+            'playback_state' => $playback?->state ?? 'playing',
+            'current_time_seconds' => $playback?->current_time_seconds ?? 0,
+            // How long ago current_time_seconds was true — measured on the server so device clocks don't matter
+            'position_age_ms' => $playback?->updated_at ? max(0, (int) $playback->updated_at->diffInMilliseconds(now())) : 0,
             'song' => [
                 'id' => $item->song->id,
                 'external_video_id' => $item->song->external_video_id,

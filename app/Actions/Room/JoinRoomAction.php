@@ -27,24 +27,44 @@ class JoinRoomAction
             $token = Str::random(40);
             $tokenHash = hash('sha256', $token);
 
-            $colors = ['#EC4899', '#06B6D4', '#10B981', '#F59E0B', '#6366F1', '#3B82F6'];
-            $randomColor = $colors[array_rand($colors)];
+            // Same device coming back (reload, exit, rejoin): reuse its guest seat instead of adding a duplicate.
+            // Only guest seats — a host's device joining by code must never take over the host seat.
+            $member = !empty($data['device_uuid'])
+                ? RoomMember::where('room_id', $room->id)
+                    ->where('device_uuid', $data['device_uuid'])
+                    ->where('role', 'guest')
+                    ->latest('id')
+                    ->first()
+                : null;
 
-            $member = RoomMember::create([
-                'room_id' => $room->id,
-                'session_token_hash' => $tokenHash,
-                'device_uuid' => $data['device_uuid'] ?? (string) Str::uuid(),
-                'nickname' => $data['nickname'],
-                'avatar_color' => $randomColor,
-                'role' => 'guest',
-                'is_connected' => true,
-                'last_seen_at' => now(),
-            ]);
+            if ($member) {
+                // The old token is unrecoverable (only its hash is stored), so the device gets a fresh one
+                $member->update([
+                    'session_token_hash' => $tokenHash,
+                    'nickname' => $data['nickname'],
+                    'is_connected' => true,
+                    'last_seen_at' => now(),
+                ]);
+            } else {
+                $colors = ['#EC4899', '#06B6D4', '#10B981', '#F59E0B', '#6366F1', '#3B82F6'];
+                $randomColor = $colors[array_rand($colors)];
+
+                $member = RoomMember::create([
+                    'room_id' => $room->id,
+                    'session_token_hash' => $tokenHash,
+                    'device_uuid' => $data['device_uuid'] ?? (string) Str::uuid(),
+                    'nickname' => $data['nickname'],
+                    'avatar_color' => $randomColor,
+                    'role' => 'guest',
+                    'is_connected' => true,
+                    'last_seen_at' => now(),
+                ]);
+            }
 
             ActivityLog::create([
                 'room_id' => $room->id,
                 'room_member_id' => $member->id,
-                'action' => 'member_joined',
+                'action' => $member->wasRecentlyCreated ? 'member_joined' : 'member_rejoined',
                 'payload' => ['nickname' => $member->nickname],
             ]);
 

@@ -17,7 +17,9 @@ class PlaybackStateChangedEvent implements ShouldBroadcastNow
     public function __construct(
         public Room $room,
         public string $state,
-        public int $currentTimeSeconds
+        public float $currentTimeSeconds,
+        public ?int $queueItemId = null,
+        public ?int $positionAtMs = null
     ) {}
 
     public function broadcastOn(): array
@@ -37,6 +39,8 @@ class PlaybackStateChangedEvent implements ShouldBroadcastNow
         return [
             'state' => $this->state,
             'current_time_seconds' => $this->currentTimeSeconds,
+            'queue_item_id' => $this->queueItemId,
+            'position_at_ms' => $this->positionAtMs,
         ];
     }
 }

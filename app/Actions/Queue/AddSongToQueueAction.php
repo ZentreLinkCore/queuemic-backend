@@ -2,6 +2,7 @@
 
 namespace App\Actions\Queue;
 
+use App\Actions\Playback\StartNextSongAction;
 use App\Models\Room;
 use App\Models\RoomMember;
 use App\Models\Song;
@@ -51,12 +52,23 @@ class AddSongToQueueAction
                 ],
             ]);
 
-            // Broadcast new queue state
-            $updatedQueue = GetRoomQueueQuery::execute($room->code);
-            try {
-                broadcast(new QueueUpdatedEvent($room, $updatedQueue));
-            } catch (Throwable $e) {
-                Log::warning('Broadcast failed on add queue: ' . $e->getMessage());
+            $isStageEmpty = !KaraokeQueue::where('room_id', $room->id)
+                ->where('status', 'playing')
+                ->exists();
+
+            if ($isStageEmpty) {
+                // Start it on the server so every device shares one "now playing" and start time
+                // (broadcasts song.started + queue.updated)
+                StartNextSongAction::execute($room);
+                $queueItem->refresh();
+            } else {
+                // Broadcast new queue state
+                $updatedQueue = GetRoomQueueQuery::execute($room->code);
+                try {
+                    broadcast(new QueueUpdatedEvent($room, $updatedQueue));
+                } catch (Throwable $e) {
+                    Log::warning('Broadcast failed on add queue: ' . $e->getMessage());
+                }
             }
 
             return [

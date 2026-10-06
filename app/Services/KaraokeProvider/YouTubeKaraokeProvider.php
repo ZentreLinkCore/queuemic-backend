@@ -37,8 +37,8 @@ class YouTubeKaraokeProvider implements KaraokeProviderInterface
             return collect($publicResults);
         }
 
-        // 3. Fallback to curated local catalog if offline or blocked
-        return (new MockKaraokeProvider())->search($query, $limit);
+        // 3. Return empty collection if no results found
+        return collect();
     }
 
     protected function searchViaApiKey(string $query, int $limit): Collection

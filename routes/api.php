@@ -1,11 +1,14 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use Illuminate\Broadcasting\BroadcastController;
 use App\Http\Controllers\Api\V1\RoomController;
 use App\Http\Controllers\Api\V1\QueueController;
 use App\Http\Controllers\Api\V1\PlaybackController;
 use App\Http\Controllers\Api\V1\SongController;
 use App\Http\Controllers\Api\V1\MemberController;
+
+use App\Http\Controllers\Api\V1\BroadcastAuthController;
 
 /*
 |--------------------------------------------------------------------------
@@ -13,13 +16,21 @@ use App\Http\Controllers\Api\V1\MemberController;
 |--------------------------------------------------------------------------
 */
 
+// Explicit Broadcast Channel Authorization endpoints for API/Mobile clients
+Route::post('/broadcasting/auth', [BroadcastAuthController::class, 'authenticate']);
+
 Route::prefix('v1')->group(function () {
+    Route::post('/broadcasting/auth', [BroadcastAuthController::class, 'authenticate']);
+
     // Public Room Operations
     Route::post('/rooms', [RoomController::class, 'store']);
     Route::post('/rooms/join', [RoomController::class, 'join']);
 
     // Catalog Search
     Route::get('/songs/search', [SongController::class, 'search']);
+
+    // Server clock for playback sync
+    Route::get('/time', [PlaybackController::class, 'clock']);
 
     // Authenticated Room Member Group
     Route::middleware(['room.member'])->group(function () {
@@ -36,19 +47,22 @@ Route::prefix('v1')->group(function () {
         // Playback Status (Read)
         Route::get('/rooms/{code}/playback', [PlaybackController::class, 'show']);
 
+        // Playback Controls (Host or Guests when allowed by room settings)
+        Route::middleware(['room.playback_control'])->group(function () {
+            Route::post('/rooms/{code}/playback/state', [PlaybackController::class, 'updateState']);
+            Route::post('/rooms/{code}/playback/next', [PlaybackController::class, 'next']);
+            Route::post('/rooms/{code}/playback/skip', [PlaybackController::class, 'skip']);
+        });
+
         // Host Only Operations
         Route::middleware(['room.host'])->group(function () {
-            // Room Management
+            // Room Management & Settings
+            Route::patch('/rooms/{code}/settings', [RoomController::class, 'updateSettings']);
             Route::delete('/rooms/{code}', [RoomController::class, 'destroy']);
             Route::post('/rooms/{code}/transfer-host', [RoomController::class, 'transferHost']);
 
             // Queue Reordering
             Route::post('/rooms/{code}/queue/{queueId}/move', [QueueController::class, 'move']);
-
-            // Playback Controls
-            Route::post('/rooms/{code}/playback/state', [PlaybackController::class, 'updateState']);
-            Route::post('/rooms/{code}/playback/next', [PlaybackController::class, 'next']);
-            Route::post('/rooms/{code}/playback/skip', [PlaybackController::class, 'skip']);
         });
     });
 });

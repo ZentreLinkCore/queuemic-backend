@@ -22,7 +22,11 @@ class LeaveRoomAction
                 'payload' => ['nickname' => $member->nickname],
             ]);
 
-            broadcast(new MemberLeftRoomEvent($room, $member->id))->toOthers();
+            try {
+                broadcast(new MemberLeftRoomEvent($room, $member->id));
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('Broadcast failed on member leave: ' . $e->getMessage());
+            }
 
             return true;
         });
