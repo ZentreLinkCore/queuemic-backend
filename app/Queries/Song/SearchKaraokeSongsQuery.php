@@ -3,8 +3,6 @@
 namespace App\Queries\Song;
 
 use App\Models\Song;
-use App\Services\KaraokeProvider\KaraokeProviderInterface;
-use App\Services\KaraokeProvider\MockKaraokeProvider;
 use App\Services\KaraokeProvider\YouTubeKaraokeProvider;
 use Illuminate\Support\Collection;
 
@@ -12,10 +10,7 @@ class SearchKaraokeSongsQuery
 {
     public static function execute(string $query, int $limit = 20): Collection
     {
-        $driver = config('karaoke.driver', 'youtube');
-        $provider = $driver === 'youtube'
-            ? new YouTubeKaraokeProvider()
-            : new MockKaraokeProvider();
+        $provider = new YouTubeKaraokeProvider();
 
         $results = $provider->search($query, $limit);
 

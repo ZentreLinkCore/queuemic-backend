@@ -6,7 +6,7 @@ return [
     | Karaoke Provider Driver
     |--------------------------------------------------------------------------
     |
-    | Supported drivers: 'mock', 'youtube'
+    | Supported drivers: 'youtube'
     |
     */
     'driver' => env('KARAOKE_PROVIDER_DRIVER', 'youtube'),

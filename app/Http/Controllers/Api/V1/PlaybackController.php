@@ -34,6 +34,17 @@ class PlaybackController extends Controller
     }
 
     /**
+     * Server clock, so every device can express "when" in one shared timeline for playback sync.
+     */
+    public function clock(): JsonResponse
+    {
+        return response()->json([
+            'success' => true,
+            'data' => ['server_time_ms' => (int) floor(microtime(true) * 1000)],
+        ]);
+    }
+
+    /**
      * Update playback state (playing, paused, buffering) (Host only).
      */
     public function updateState(UpdatePlaybackRequest $request, string $code): JsonResponse
@@ -43,7 +54,9 @@ class PlaybackController extends Controller
             UpdatePlaybackStateAction::execute(
                 $room,
                 $request->validated('state'),
-                $request->validated('current_time_seconds', 0)
+                (float) $request->validated('current_time_seconds', 0),
+                $request->validated('queue_item_id'),
+                $request->validated('position_at_ms')
             );
 
             return response()->json([

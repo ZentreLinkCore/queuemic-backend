@@ -16,7 +16,9 @@ class GetRoomMembersQuery
             return collect();
         }
 
+        // Members who exited are kept (their seat is reused on rejoin) but are not listed
         return RoomMember::where('room_id', $room->id)
+            ->where('is_connected', true)
             ->orderByRaw("FIELD(role, 'host', 'guest')")
             ->orderBy('created_at', 'asc')
             ->get()
@@ -27,8 +29,8 @@ class GetRoomMembersQuery
                     'nickname' => $member->nickname,
                     'avatar_color' => $member->avatar_color,
                     'role' => $member->role,
-                    'is_connected' => $member->is_connected,
-                    'last_seen_at' => $member->last_seen_at->toISOString(),
+                    'is_connected' => (bool) $member->is_connected,
+                    'last_seen_at' => $member->last_seen_at?->toISOString() ?? now()->toISOString(),
                 ];
             });
     }

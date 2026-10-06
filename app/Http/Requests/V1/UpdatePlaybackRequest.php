@@ -15,7 +15,10 @@ class UpdatePlaybackRequest extends FormRequest
     {
         return [
             'state' => 'required|in:playing,paused,buffering,stopped',
-            'current_time_seconds' => 'nullable|integer|min:0',
+            'current_time_seconds' => 'nullable|numeric|min:0',
+            'queue_item_id' => 'nullable|integer',
+            // Server-clock ms at which current_time_seconds was true (host converts via GET /time)
+            'position_at_ms' => 'nullable|integer|min:0',
         ];
     }
 }

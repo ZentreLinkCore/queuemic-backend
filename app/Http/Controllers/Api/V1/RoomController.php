@@ -7,10 +7,12 @@ use App\Actions\Room\JoinRoomAction;
 use App\Actions\Room\LeaveRoomAction;
 use App\Actions\Room\TransferHostAction;
 use App\Actions\Room\CloseRoomAction;
+use App\Actions\Room\UpdateRoomSettingsAction;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\V1\CreateRoomRequest;
 use App\Http\Requests\V1\JoinRoomRequest;
 use App\Http\Requests\V1\TransferHostRequest;
+use App\Http\Requests\V1\UpdateRoomSettingsRequest;
 use App\Queries\Room\GetRoomDetailsQuery;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -136,6 +138,34 @@ class RoomController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => $e->getMessage(),
+            ], 400);
+        }
+    }
+
+    /**
+     * Update room settings and preferences (Host only).
+     */
+    public function updateSettings(UpdateRoomSettingsRequest $request, string $code): JsonResponse
+    {
+        try {
+            $room = $request->attributes->get('room');
+            $updatedRoom = UpdateRoomSettingsAction::execute($room, $request->validated());
+
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'id' => $updatedRoom->id,
+                    'code' => $updatedRoom->code,
+                    'name' => $updatedRoom->name,
+                    'settings' => $updatedRoom->settings,
+                ],
+                'message' => 'Room settings updated successfully.',
+            ]);
+        } catch (Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+                'code' => 'SETTINGS_UPDATE_FAILED',
             ], 400);
         }
     }

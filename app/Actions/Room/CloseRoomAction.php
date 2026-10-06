@@ -23,7 +23,11 @@ class CloseRoomAction
                 'payload' => ['closed_at' => now()->toISOString()],
             ]);
 
-            broadcast(new RoomClosedEvent($room));
+            try {
+                broadcast(new RoomClosedEvent($room));
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('Broadcast failed on room close: ' . $e->getMessage());
+            }
 
             return true;
         });

@@ -13,9 +13,15 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
+        $middleware->validateCsrfTokens(except: [
+            'broadcasting/auth',
+            'api/*',
+        ]);
+
         $middleware->alias([
             'room.member' => \App\Http\Middleware\EnsureRoomMember::class,
             'room.host' => \App\Http\Middleware\EnsureRoomHost::class,
+            'room.playback_control' => \App\Http\Middleware\EnsurePlaybackControl::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
