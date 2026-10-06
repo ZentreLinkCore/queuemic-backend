@@ -21,7 +21,7 @@ class CreateRoomAction
 
             $room = Room::create([
                 'code' => $code,
-                'name' => $data['room_name'] ?? 'Karaoke Party Room',
+                'name' => $data['room_name'] ?? 'QueueMic Lounge',
                 'status' => 'active',
                 'settings' => [
                     'allow_guest_reorder' => false,
