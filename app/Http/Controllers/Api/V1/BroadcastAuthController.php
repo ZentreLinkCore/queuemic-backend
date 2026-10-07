@@ -47,6 +47,19 @@ class BroadcastAuthController extends Controller
      */
     public function config()
     {
+        // Apps connect to whichever broadcaster BROADCAST_CONNECTION selects, so switching between
+        // Reverb and Pusher is a backend .env change only
+        if (config('broadcasting.default') === 'pusher') {
+            $pusher = config('broadcasting.connections.pusher');
+
+            return response()->json([
+                'broadcaster' => 'pusher',
+                'key' => $pusher['key'],
+                'cluster' => $pusher['options']['cluster'] ?? 'mt1',
+                'useTLS' => true,
+            ]);
+        }
+
         $app = config('reverb.apps.apps.0', []);
         $options = $app['options'] ?? [];
 
