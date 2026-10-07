@@ -29,6 +29,8 @@ class PlaybackController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => $e->getMessage(),
+                'code' => 'PLAYBACK_FETCH_FAILED',
+                'errors' => (object) [],
             ], 500);
         }
     }
@@ -67,6 +69,8 @@ class PlaybackController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => $e->getMessage(),
+                'code' => 'PLAYBACK_UPDATE_FAILED',
+                'errors' => (object) [],
             ], 400);
         }
     }
@@ -89,6 +93,8 @@ class PlaybackController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => $e->getMessage(),
+                'code' => 'NEXT_FAILED',
+                'errors' => (object) [],
             ], 400);
         }
     }
@@ -113,6 +119,8 @@ class PlaybackController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => $e->getMessage(),
+                'code' => 'SKIP_FAILED',
+                'errors' => (object) [],
             ], 400);
         }
     }

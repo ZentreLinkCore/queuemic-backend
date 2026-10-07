@@ -22,6 +22,7 @@ class EnsureQueueReorder
                 'success' => false,
                 'message' => 'Unauthorized room access.',
                 'code' => 'UNAUTHORIZED',
+                'errors' => (object) [],
             ], 403);
         }
 
@@ -35,7 +36,8 @@ class EnsureQueueReorder
             return response()->json([
                 'success' => false,
                 'message' => 'Queue reordering is restricted to the room host.',
-                'code' => 'REORDER_RESTRICTED',
+                'code' => 'HOST_PERMISSION_REQUIRED',
+                'errors' => (object) [],
             ], 403);
         }
 

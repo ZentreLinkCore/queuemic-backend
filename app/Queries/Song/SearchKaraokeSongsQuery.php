@@ -25,7 +25,7 @@ class SearchKaraokeSongsQuery
 
         $results = self::searchAndStore($query, $limit);
 
-        // Never cache an empty page: that is usually a failed scrape, not a real "no results"
+        // Never cache an empty page: that is usually a failed or unconfigured provider, not a real "no results"
         if ($results->isNotEmpty()) {
             Cache::put($cacheKey, $results->all(), now()->addMinutes(self::CACHE_TTL_MINUTES));
         }

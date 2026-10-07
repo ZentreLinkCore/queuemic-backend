@@ -28,22 +28,26 @@ Route::prefix('v1')->group(function () {
     Route::post('/rooms', [RoomController::class, 'store']);
     Route::post('/rooms/join', [RoomController::class, 'join']);
 
-    // Catalog Search
-    Route::get('/songs/search', [SongController::class, 'search']);
-
     // Server clock for playback sync
     Route::get('/time', [PlaybackController::class, 'clock']);
 
     // Authenticated Room Member Group
     Route::middleware(['room.member'])->group(function () {
+        // Catalog Search (room is identified by the room_code query parameter)
+        Route::get('/songs/search', [SongController::class, 'search'])->middleware('throttle:song-search');
+
         // Room Details & Members
         Route::get('/rooms/{code}', [RoomController::class, 'show']);
         Route::post('/rooms/{code}/leave', [RoomController::class, 'leave']);
         Route::get('/rooms/{code}/members', [MemberController::class, 'index']);
+        // Presence: the host seat's last_seen_at decides when an abandoned room closes
+        Route::post('/rooms/{code}/heartbeat', [MemberController::class, 'heartbeat']);
 
         // Queue Operations (Guest & Host)
         Route::get('/rooms/{code}/queue', [QueueController::class, 'index']);
         Route::post('/rooms/{code}/queue', [QueueController::class, 'store']);
+        // Host or the member who queued the song (checked in RemoveQueueItemAction)
+        Route::delete('/rooms/{code}/queue/{queueId}', [QueueController::class, 'destroy']);
 
         // Playback Status (Read)
         Route::get('/rooms/{code}/playback', [PlaybackController::class, 'show']);
@@ -62,7 +66,6 @@ Route::prefix('v1')->group(function () {
 
         // Host Only Operations
         Route::middleware(['room.host'])->group(function () {
-            Route::delete('/rooms/{code}/queue/{queueId}', [QueueController::class, 'destroy']);
             // Room Management & Settings
             Route::patch('/rooms/{code}/settings', [RoomController::class, 'updateSettings']);
             Route::delete('/rooms/{code}', [RoomController::class, 'destroy']);

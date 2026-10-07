@@ -10,16 +10,16 @@ use Illuminate\Support\Facades\Schema;
 class CleanupInactiveRoomsAction
 {
     /**
-     * Close rooms nobody has sung in for a while, then delete closed rooms and data nothing reads anymore.
+     * Close rooms whose host has been away too long, then delete closed rooms and data nothing reads anymore.
      *
      * @return array{expired_rooms: int, deleted_rooms: int, deleted_songs: int, deleted_cache_rows: int}
      */
     public static function execute(): array
     {
-        // Same idle rule the entry points use (join, every room request), so nothing disagrees about it
-        $idleCutoff = now()->subMinutes((int) config('karaoke.room_idle_minutes', 30));
+        // Same host-away rule the entry points use (join, every room request), so nothing disagrees about it
+        $awayCutoff = now()->subMinutes((int) config('karaoke.host_away_minutes', 30));
         $expiredRooms = Room::where('status', 'active')
-            ->where('created_at', '<', $idleCutoff)
+            ->where('created_at', '<', $awayCutoff)
             ->get()
             ->filter(fn (Room $room) => ExpireRoomIfIdleAction::execute($room))
             ->count();

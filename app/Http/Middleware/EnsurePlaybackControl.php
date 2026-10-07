@@ -22,6 +22,7 @@ class EnsurePlaybackControl
                 'success' => false,
                 'message' => 'Unauthorized room access.',
                 'code' => 'UNAUTHORIZED',
+                'errors' => (object) [],
             ], 403);
         }
 
@@ -30,8 +31,9 @@ class EnsurePlaybackControl
         if (!$member->isHost() && !$allowGuestPlayback) {
             return response()->json([
                 'success' => false,
-                'message' => 'Playback controls are restricted to the room host.',
-                'code' => 'PLAYBACK_CONTROL_RESTRICTED',
+                'message' => 'Only the room host can control playback',
+                'code' => 'HOST_PERMISSION_REQUIRED',
+                'errors' => (object) [],
             ], 403);
         }
 

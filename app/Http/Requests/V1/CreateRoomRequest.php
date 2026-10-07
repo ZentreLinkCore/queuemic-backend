@@ -14,9 +14,10 @@ class CreateRoomRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'room_name' => 'required|string|min:2|max:100',
-            'nickname' => 'required|string|min:1|max:50',
-            'device_uuid' => 'nullable|string|max:100',
+            'room_name' => 'required|string|min:2|max:50',
+            // No angle brackets: nicknames are echoed to every device in the room
+            'nickname' => 'required|string|min:2|max:30|not_regex:/[<>]/',
+            'device_uuid' => 'nullable|string|max:64',
         ];
     }
 }
