@@ -14,7 +14,8 @@ class MoveQueueRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'direction' => 'required|in:up,down',
+            'direction' => 'nullable|in:up,down,top,bottom',
+            'target_position' => 'nullable|integer|min:1',
         ];
     }
 }

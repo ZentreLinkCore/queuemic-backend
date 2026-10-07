@@ -27,6 +27,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'room.member' => \App\Http\Middleware\EnsureRoomMember::class,
             'room.host' => \App\Http\Middleware\EnsureRoomHost::class,
             'room.playback_control' => \App\Http\Middleware\EnsurePlaybackControl::class,
+            'room.queue_reorder' => \App\Http\Middleware\EnsureQueueReorder::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {

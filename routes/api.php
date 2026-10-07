@@ -44,7 +44,6 @@ Route::prefix('v1')->group(function () {
         // Queue Operations (Guest & Host)
         Route::get('/rooms/{code}/queue', [QueueController::class, 'index']);
         Route::post('/rooms/{code}/queue', [QueueController::class, 'store']);
-        Route::delete('/rooms/{code}/queue/{queueId}', [QueueController::class, 'destroy']);
 
         // Playback Status (Read)
         Route::get('/rooms/{code}/playback', [PlaybackController::class, 'show']);
@@ -56,15 +55,18 @@ Route::prefix('v1')->group(function () {
             Route::post('/rooms/{code}/playback/skip', [PlaybackController::class, 'skip']);
         });
 
+        // Queue Reordering (Host or Guests when allowed by room settings)
+        Route::middleware(['room.queue_reorder'])->group(function () {
+            Route::post('/rooms/{code}/queue/{queueId}/move', [QueueController::class, 'move']);
+        });
+
         // Host Only Operations
         Route::middleware(['room.host'])->group(function () {
+            Route::delete('/rooms/{code}/queue/{queueId}', [QueueController::class, 'destroy']);
             // Room Management & Settings
             Route::patch('/rooms/{code}/settings', [RoomController::class, 'updateSettings']);
             Route::delete('/rooms/{code}', [RoomController::class, 'destroy']);
             Route::post('/rooms/{code}/transfer-host', [RoomController::class, 'transferHost']);
-
-            // Queue Reordering
-            Route::post('/rooms/{code}/queue/{queueId}/move', [QueueController::class, 'move']);
         });
     });
 });

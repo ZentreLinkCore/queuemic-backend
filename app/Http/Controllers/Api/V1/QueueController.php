@@ -60,7 +60,7 @@ class QueueController extends Controller
     }
 
     /**
-     * Move an item up or down in the queue (Host only).
+     * Move an item in the queue (Host or Guests when allowed).
      */
     public function move(MoveQueueRequest $request, string $code, int $queueId): JsonResponse
     {
@@ -69,7 +69,8 @@ class QueueController extends Controller
             $result = MoveQueueItemAction::execute(
                 $room,
                 $queueId,
-                $request->validated('direction')
+                $request->validated('direction'),
+                $request->validated('target_position')
             );
 
             return response()->json([

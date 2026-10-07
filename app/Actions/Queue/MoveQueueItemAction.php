@@ -12,9 +12,9 @@ use Symfony\Component\HttpKernel\Exception\UnprocessableEntityHttpException;
 
 class MoveQueueItemAction
 {
-    public static function execute(Room $room, int $queueItemId, string $direction): array
+    public static function execute(Room $room, int $queueItemId, ?string $direction = null, ?int $targetPosition = null): array
     {
-        return DB::transaction(function () use ($room, $queueItemId, $direction) {
+        return DB::transaction(function () use ($room, $queueItemId, $direction, $targetPosition) {
             $items = KaraokeQueue::where('room_id', $room->id)
                 ->where('status', 'pending')
                 ->orderBy('position', 'asc')
@@ -27,19 +27,41 @@ class MoveQueueItemAction
                 throw new NotFoundHttpException('Queue item not found or already played.');
             }
 
-            $targetIndex = $direction === 'up' ? $currentIndex - 1 : $currentIndex + 1;
-
-            if ($targetIndex < 0 || $targetIndex >= $items->count()) {
-                throw new UnprocessableEntityHttpException('Cannot move item beyond queue bounds.');
+            $count = $items->count();
+            if ($count <= 1) {
+                $updatedQueue = GetRoomQueueQuery::execute($room->code);
+                return [
+                    'success' => true,
+                    'queue' => $updatedQueue,
+                ];
             }
 
-            $currentItem = $items[$currentIndex];
-            $targetItem = $items[$targetIndex];
+            $targetIndex = $currentIndex;
+            if ($targetPosition !== null) {
+                $targetIndex = max(0, min($count - 1, $targetPosition - 1));
+            } elseif ($direction === 'up') {
+                $targetIndex = max(0, $currentIndex - 1);
+            } elseif ($direction === 'down') {
+                $targetIndex = min($count - 1, $currentIndex + 1);
+            } elseif ($direction === 'top') {
+                $targetIndex = 0;
+            } elseif ($direction === 'bottom') {
+                $targetIndex = $count - 1;
+            }
 
-            // Swap positions
-            $tempPos = $currentItem->position;
-            $currentItem->update(['position' => $targetItem->position]);
-            $targetItem->update(['position' => $tempPos]);
+            if ($targetIndex !== $currentIndex) {
+                // Remove item from current position and insert at target position
+                $itemToMove = $items->splice($currentIndex, 1)->first();
+                $items->splice($targetIndex, 0, [$itemToMove]);
+
+                // Renumber all positions 1..N
+                foreach ($items as $idx => $item) {
+                    $newPos = $idx + 1;
+                    if ($item->position !== $newPos) {
+                        $item->update(['position' => $newPos]);
+                    }
+                }
+            }
 
             $updatedQueue = GetRoomQueueQuery::execute($room->code);
             broadcast(new QueueUpdatedEvent($room, $updatedQueue));
