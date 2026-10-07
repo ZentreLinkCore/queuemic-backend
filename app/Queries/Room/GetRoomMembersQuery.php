@@ -19,7 +19,7 @@ class GetRoomMembersQuery
         // Members who exited are kept (their seat is reused on rejoin) but are not listed
         return RoomMember::where('room_id', $room->id)
             ->where('is_connected', true)
-            ->orderByRaw("FIELD(role, 'host', 'guest')")
+            ->orderByRaw("CASE WHEN role = 'host' THEN 1 ELSE 2 END")
             ->orderBy('created_at', 'asc')
             ->get()
             ->map(function ($member) {

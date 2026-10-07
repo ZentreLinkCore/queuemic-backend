@@ -16,16 +16,24 @@ class JoinRoomAction
 {
     public static function execute(array $data): array
     {
-        return DB::transaction(function () use ($data) {
-            $roomCode = strtoupper($data['room_code']);
-            $room = Room::where('code', $roomCode)->where('status', 'active')->first();
+        $roomCode = strtoupper($data['room_code']);
+        $room = Room::where('code', $roomCode)->where('status', 'active')->first();
 
-            if (!$room) {
-                throw new NotFoundHttpException('Room not found or has been closed.');
-            }
+        if (!$room) {
+            throw new NotFoundHttpException('Room not found or has been closed.');
+        }
+
+        // Checked before the transaction: the throw below would otherwise roll back the room's closing
+        if (ExpireRoomIfIdleAction::execute($room)) {
+            throw new NotFoundHttpException(ExpireRoomIfIdleAction::message());
+        }
+
+        return DB::transaction(function () use ($data, $room) {
 
             $token = Str::random(40);
             $tokenHash = hash('sha256', $token);
+
+            $targetNickname = trim($data['nickname']);
 
             // Same device coming back (reload, exit, rejoin): reuse its guest seat instead of adding a duplicate.
             // Only guest seats — a host's device joining by code must never take over the host seat.
@@ -37,11 +45,28 @@ class JoinRoomAction
                     ->first()
                 : null;
 
+            // Check if this nickname is already taken by another active member in the room (case-insensitive)
+            $isNicknameTaken = RoomMember::where('room_id', $room->id)
+                ->where('is_connected', true)
+                ->where(function ($query) use ($targetNickname) {
+                    $query->whereRaw('LOWER(nickname) = ?', [strtolower($targetNickname)]);
+                })
+                ->when($member, function ($query, $existingMember) {
+                    $query->where('id', '!=', $existingMember->id);
+                })
+                ->exists();
+
+            if ($isNicknameTaken) {
+                throw new \Symfony\Component\HttpKernel\Exception\UnprocessableEntityHttpException(
+                    "The nickname '{$targetNickname}' is already taken in this room. Please choose a different nickname."
+                );
+            }
+
             if ($member) {
                 // The old token is unrecoverable (only its hash is stored), so the device gets a fresh one
                 $member->update([
                     'session_token_hash' => $tokenHash,
-                    'nickname' => $data['nickname'],
+                    'nickname' => $targetNickname,
                     'is_connected' => true,
                     'last_seen_at' => now(),
                 ]);

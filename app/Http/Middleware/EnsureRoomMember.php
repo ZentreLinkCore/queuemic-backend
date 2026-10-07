@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Actions\Room\ExpireRoomIfIdleAction;
 use App\Models\Room;
 use App\Models\RoomMember;
 use Closure;
@@ -28,6 +29,15 @@ class EnsureRoomMember
             return response()->json([
                 'success' => false,
                 'message' => 'Room not found or has been closed.',
+                'code' => 'ROOM_NOT_FOUND',
+            ], 404);
+        }
+
+        // Idle past the expiry window: close it now instead of letting anyone in until the next cleanup pass
+        if (ExpireRoomIfIdleAction::execute($room)) {
+            return response()->json([
+                'success' => false,
+                'message' => ExpireRoomIfIdleAction::message(),
                 'code' => 'ROOM_NOT_FOUND',
             ], 404);
         }

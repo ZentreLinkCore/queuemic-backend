@@ -15,7 +15,8 @@ class RoomClosedEvent implements ShouldBroadcastNow
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
     public function __construct(
-        public Room $room
+        public Room $room,
+        public string $message = 'The party has ended. The host has closed the room.'
     ) {}
 
     public function broadcastOn(): array
@@ -34,7 +35,7 @@ class RoomClosedEvent implements ShouldBroadcastNow
     {
         return [
             'room_code' => $this->room->code,
-            'message' => 'The party has ended. The host has closed the room.',
+            'message' => $this->message,
         ];
     }
 }

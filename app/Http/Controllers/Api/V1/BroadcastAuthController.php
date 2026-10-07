@@ -41,4 +41,27 @@ class BroadcastAuthController extends Controller
             ], 403);
         }
     }
+
+    /**
+     * Return public broadcasting config for mobile / web clients.
+     */
+    public function config()
+    {
+        $app = config('reverb.apps.apps.0', []);
+        $options = $app['options'] ?? [];
+
+        $host = $options['host'] ?? env('REVERB_HOST', 'localhost');
+        $port = (int) ($options['port'] ?? env('REVERB_PORT', 8082));
+        $scheme = $options['scheme'] ?? env('REVERB_SCHEME', 'http');
+        $key = $app['key'] ?? env('REVERB_APP_KEY', '2n9ub0vuljc3wvqv0tgl');
+
+        return response()->json([
+            'broadcaster' => 'reverb',
+            'key' => $key,
+            'host' => $host,
+            'port' => $port,
+            'scheme' => $scheme,
+            'useTLS' => ($scheme === 'https' || $port === 443),
+        ]);
+    }
 }

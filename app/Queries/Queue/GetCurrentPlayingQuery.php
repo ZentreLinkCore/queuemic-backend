@@ -15,7 +15,7 @@ class GetCurrentPlayingQuery
             return null;
         }
 
-        $item = KaraokeQueue::with(['song', 'requestedBy'])
+        $item = KaraokeQueue::with('song')
             ->where('room_id', $room->id)
             ->where('status', 'playing')
             ->first();

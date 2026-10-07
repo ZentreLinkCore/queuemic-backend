@@ -17,9 +17,11 @@ use App\Http\Controllers\Api\V1\BroadcastAuthController;
 */
 
 // Explicit Broadcast Channel Authorization endpoints for API/Mobile clients
+Route::get('/broadcasting/config', [BroadcastAuthController::class, 'config']);
 Route::post('/broadcasting/auth', [BroadcastAuthController::class, 'authenticate']);
 
 Route::prefix('v1')->group(function () {
+    Route::get('/broadcasting/config', [BroadcastAuthController::class, 'config']);
     Route::post('/broadcasting/auth', [BroadcastAuthController::class, 'authenticate']);
 
     // Public Room Operations

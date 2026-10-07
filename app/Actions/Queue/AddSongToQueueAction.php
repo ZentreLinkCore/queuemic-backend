@@ -26,11 +26,14 @@ class AddSongToQueueAction
                 throw new NotFoundHttpException('Song not found in catalog.');
             }
 
-            // Calculate next position
-            $maxPosition = KaraokeQueue::where('room_id', $room->id)
+            // Calculate next position (avoid FOR UPDATE with aggregate functions on Postgres)
+            $lastItem = KaraokeQueue::where('room_id', $room->id)
                 ->where('status', 'pending')
+                ->orderBy('position', 'desc')
                 ->lockForUpdate()
-                ->max('position') ?? 0;
+                ->first();
+
+            $maxPosition = $lastItem?->position ?? 0;
 
             $queueItem = KaraokeQueue::create([
                 'room_id' => $room->id,

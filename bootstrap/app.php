@@ -18,6 +18,11 @@ return Application::configure(basePath: dirname(__DIR__))
             'api/*',
         ]);
 
+        // Expires idle rooms and deletes unused data piggybacking on API traffic (no scheduler process needed)
+        $middleware->api(append: [
+            \App\Http\Middleware\CleanupInactiveRooms::class,
+        ]);
+
         $middleware->alias([
             'room.member' => \App\Http\Middleware\EnsureRoomMember::class,
             'room.host' => \App\Http\Middleware\EnsureRoomHost::class,

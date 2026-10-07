@@ -53,12 +53,24 @@ class RoomController extends Controller
                 'data' => $result,
                 'message' => 'Joined room successfully.',
             ], 200);
+        } catch (\Symfony\Component\HttpKernel\Exception\NotFoundHttpException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+                'code' => 'ROOM_NOT_FOUND',
+            ], 404);
+        } catch (\Symfony\Component\HttpKernel\Exception\UnprocessableEntityHttpException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+                'code' => 'NICKNAME_TAKEN',
+            ], 422);
         } catch (Exception $e) {
             return response()->json([
                 'success' => false,
                 'message' => $e->getMessage(),
                 'code' => 'ROOM_JOIN_FAILED',
-            ], 404);
+            ], 400);
         }
     }
 

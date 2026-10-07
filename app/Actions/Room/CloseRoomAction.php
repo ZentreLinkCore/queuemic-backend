@@ -9,9 +9,9 @@ use Illuminate\Support\Facades\DB;
 
 class CloseRoomAction
 {
-    public static function execute(Room $room): bool
+    public static function execute(Room $room, ?string $message = null): bool
     {
-        return DB::transaction(function () use ($room) {
+        return DB::transaction(function () use ($room, $message) {
             $room->update([
                 'status' => 'closed',
                 'closed_at' => now(),
@@ -24,7 +24,7 @@ class CloseRoomAction
             ]);
 
             try {
-                broadcast(new RoomClosedEvent($room));
+                broadcast($message ? new RoomClosedEvent($room, $message) : new RoomClosedEvent($room));
             } catch (\Throwable $e) {
                 \Illuminate\Support\Facades\Log::warning('Broadcast failed on room close: ' . $e->getMessage());
             }

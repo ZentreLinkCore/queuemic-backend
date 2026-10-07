@@ -16,7 +16,7 @@ class GetRoomQueueQuery
             return collect();
         }
 
-        return KaraokeQueue::with(['song', 'requestedBy'])
+        return KaraokeQueue::with('song')
             ->where('room_id', $room->id)
             ->where('status', 'pending')
             ->orderBy('position', 'asc')
