@@ -36,8 +36,10 @@ class BroadcastAuthController extends Controller
             return Broadcast::auth($request);
         } catch (\Throwable $e) {
             return response()->json([
+                'success' => false,
                 'message' => $e->getMessage() ?: 'Unauthorized to access this broadcast channel.',
-                'error' => 'Broadcast authorization failed.',
+                'code' => 'BROADCAST_AUTH_FAILED',
+                'errors' => (object) [],
             ], 403);
         }
     }
