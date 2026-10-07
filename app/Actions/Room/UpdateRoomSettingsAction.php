@@ -19,7 +19,6 @@ class UpdateRoomSettingsAction
 
             $settingKeys = [
                 'allow_guest_reorder',
-                'allow_explicit',
                 'allow_guest_playback_control',
                 'max_queue_per_user',
             ];

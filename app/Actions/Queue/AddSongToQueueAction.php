@@ -17,6 +17,9 @@ use Throwable;
 
 class AddSongToQueueAction
 {
+    // A double tap or a retried request re-sends the same song for the same singer within moments
+    private const DUPLICATE_WINDOW_SECONDS = 5;
+
     public static function execute(Room $room, RoomMember $member, array $data): array
     {
         return DB::transaction(function () use ($room, $member, $data) {
@@ -35,11 +38,26 @@ class AddSongToQueueAction
 
             $maxPosition = $lastItem?->position ?? 0;
 
+            $singerName = !empty($data['singer_name']) ? $data['singer_name'] : $member->nickname;
+
+            // Same song, same singer, seconds apart: hand back the item already queued instead of a duplicate
+            $duplicate = KaraokeQueue::where('room_id', $room->id)
+                ->where('song_id', $song->id)
+                ->where('requested_by_member_id', $member->id)
+                ->where('singer_name', $singerName)
+                ->whereIn('status', ['pending', 'playing'])
+                ->where('created_at', '>=', now()->subSeconds(self::DUPLICATE_WINDOW_SECONDS))
+                ->first();
+
+            if ($duplicate) {
+                return self::toPayload($duplicate, $song);
+            }
+
             $queueItem = KaraokeQueue::create([
                 'room_id' => $room->id,
                 'song_id' => $song->id,
                 'requested_by_member_id' => $member->id,
-                'singer_name' => !empty($data['singer_name']) ? $data['singer_name'] : $member->nickname,
+                'singer_name' => $singerName,
                 'position' => $maxPosition + 1,
                 'status' => 'pending',
             ]);
@@ -74,16 +92,21 @@ class AddSongToQueueAction
                 }
             }
 
-            return [
-                'id' => $queueItem->id,
-                'room_id' => $queueItem->room_id,
-                'song_id' => $queueItem->song_id,
-                'requested_by_member_id' => $queueItem->requested_by_member_id,
-                'singer_name' => $queueItem->singer_name,
-                'position' => $queueItem->position,
-                'status' => $queueItem->status,
-                'song' => $song,
-            ];
+            return self::toPayload($queueItem, $song);
         });
+    }
+
+    private static function toPayload(KaraokeQueue $queueItem, Song $song): array
+    {
+        return [
+            'id' => $queueItem->id,
+            'room_id' => $queueItem->room_id,
+            'song_id' => $queueItem->song_id,
+            'requested_by_member_id' => $queueItem->requested_by_member_id,
+            'singer_name' => $queueItem->singer_name,
+            'position' => $queueItem->position,
+            'status' => $queueItem->status,
+            'song' => $song,
+        ];
     }
 }

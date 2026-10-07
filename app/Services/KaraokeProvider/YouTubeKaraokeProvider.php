@@ -60,18 +60,23 @@ class YouTubeKaraokeProvider implements KaraokeProviderInterface
 
             if ($response->successful()) {
                 $items = $response->json('items', []);
-                return collect($items)->map(function ($item) {
+                $durations = $this->fetchDurations(array_values(array_filter(
+                    array_map(fn ($item) => $item['id']['videoId'] ?? null, $items)
+                )));
+
+                return collect($items)->map(function ($item) use ($durations) {
                     $id = $item['id']['videoId'] ?? '';
                     $title = $item['snippet']['title'] ?? 'Karaoke Track';
                     $artist = $item['snippet']['channelTitle'] ?? 'Unknown Artist';
                     $thumbnail = $item['snippet']['thumbnails']['high']['url'] ?? $item['snippet']['thumbnails']['default']['url'] ?? "https://img.youtube.com/vi/{$id}/hqdefault.jpg";
+                    $seconds = $durations[$id] ?? 0;
 
                     return [
                         'external_video_id' => $id,
                         'title' => html_entity_decode($title, ENT_QUOTES | ENT_HTML5),
                         'artist' => html_entity_decode($artist, ENT_QUOTES | ENT_HTML5),
-                        'duration_formatted' => '03:45',
-                        'duration_seconds' => 225,
+                        'duration_formatted' => $this->formatDuration($seconds),
+                        'duration_seconds' => $seconds,
                         'thumbnail_url' => $thumbnail,
                         'source_provider' => 'youtube',
                     ];
@@ -82,6 +87,57 @@ class YouTubeKaraokeProvider implements KaraokeProviderInterface
         }
 
         return collect();
+    }
+
+    /**
+     * Search results carry no length, so one videos call fetches it for the whole page (ISO-8601, e.g. PT4M13S).
+     * A length that cannot be read stays 0 — the column's "unknown" default — rather than a made-up value.
+     *
+     * @param string[] $videoIds
+     * @return array<string, int> seconds keyed by video id
+     */
+    protected function fetchDurations(array $videoIds): array
+    {
+        if (empty($videoIds)) {
+            return [];
+        }
+
+        try {
+            $response = Http::timeout(8)->get('https://www.googleapis.com/youtube/v3/videos', [
+                'part' => 'contentDetails',
+                'id' => implode(',', $videoIds),
+                'key' => $this->apiKey,
+            ]);
+
+            if (!$response->successful()) {
+                return [];
+            }
+
+            $durations = [];
+            foreach ($response->json('items', []) as $video) {
+                try {
+                    $interval = new \DateInterval($video['contentDetails']['duration'] ?? 'PT0S');
+                    $durations[$video['id']] = $interval->d * 86400 + $interval->h * 3600 + $interval->i * 60 + $interval->s;
+                } catch (\Exception) {
+                    // Unparseable length (e.g. an upcoming premiere): leave it unknown
+                }
+            }
+
+            return $durations;
+        } catch (\Exception $e) {
+            Log::warning('YouTube video length lookup failed: ' . $e->getMessage());
+        }
+
+        return [];
+    }
+
+    protected function formatDuration(int $seconds): string
+    {
+        $hours = intdiv($seconds, 3600);
+
+        return $hours > 0
+            ? sprintf('%d:%02d:%02d', $hours, intdiv($seconds % 3600, 60), $seconds % 60)
+            : sprintf('%02d:%02d', intdiv($seconds, 60), $seconds % 60);
     }
 
     protected function searchPublic(string $query, int $limit): array

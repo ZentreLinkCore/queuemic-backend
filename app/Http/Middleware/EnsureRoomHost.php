@@ -19,6 +19,7 @@ class EnsureRoomHost
                 'success' => false,
                 'message' => 'Only the room host can control playback and room settings.',
                 'code' => 'HOST_PERMISSION_REQUIRED',
+                'errors' => (object) [],
             ], 403);
         }
 

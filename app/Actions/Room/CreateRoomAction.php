@@ -25,7 +25,6 @@ class CreateRoomAction
                 'status' => 'active',
                 'settings' => [
                     'allow_guest_reorder' => false,
-                    'allow_explicit' => true,
                     'allow_guest_playback_control' => false,
                 ],
             ]);

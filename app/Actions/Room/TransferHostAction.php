@@ -8,12 +8,18 @@ use App\Models\ActivityLog;
 use App\Events\HostTransferredEvent;
 use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
+use Symfony\Component\HttpKernel\Exception\UnprocessableEntityHttpException;
 
 class TransferHostAction
 {
     public static function execute(Room $room, RoomMember $currentHost, int $newHostMemberId): array
     {
         return DB::transaction(function () use ($room, $currentHost, $newHostMemberId) {
+            // Demoting then "promoting" the same row would leave the room with no host at all
+            if ($newHostMemberId === $currentHost->id) {
+                throw new UnprocessableEntityHttpException('You are already the host. Choose another member.');
+            }
+
             $newHost = RoomMember::where('id', $newHostMemberId)
                 ->where('room_id', $room->id)
                 ->first();

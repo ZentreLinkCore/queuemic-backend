@@ -20,6 +20,7 @@ class EnsureRoomMember
                 'success' => false,
                 'message' => 'Room code is required.',
                 'code' => 'ROOM_CODE_REQUIRED',
+                'errors' => (object) [],
             ], 400);
         }
 
@@ -28,8 +29,9 @@ class EnsureRoomMember
         if (!$room) {
             return response()->json([
                 'success' => false,
-                'message' => 'Room not found or has been closed.',
+                'message' => 'Room not found or closed',
                 'code' => 'ROOM_NOT_FOUND',
+                'errors' => (object) [],
             ], 404);
         }
 
@@ -39,6 +41,7 @@ class EnsureRoomMember
                 'success' => false,
                 'message' => ExpireRoomIfIdleAction::message(),
                 'code' => 'ROOM_NOT_FOUND',
+                'errors' => (object) [],
             ], 404);
         }
 
@@ -49,6 +52,7 @@ class EnsureRoomMember
                 'success' => false,
                 'message' => 'Authentication token required.',
                 'code' => 'UNAUTHENTICATED',
+                'errors' => (object) [],
             ], 401);
         }
 
@@ -62,6 +66,7 @@ class EnsureRoomMember
                 'success' => false,
                 'message' => 'Invalid session or member not in this room.',
                 'code' => 'INVALID_SESSION',
+                'errors' => (object) [],
             ], 403);
         }
 

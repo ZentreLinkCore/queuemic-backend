@@ -27,6 +27,11 @@ Broadcast::channel('room.{code}', function ($user = null, ?string $code = null) 
     }
 
     if ($user) {
+        // A closed room keeps its member rows until cleanup; their tokens must not reopen its channel
+        if (!$user->room || $user->room->status !== 'active') {
+            return false;
+        }
+
         if ($code && $user->room && strtoupper($user->room->code) !== strtoupper($code)) {
             return false;
         }

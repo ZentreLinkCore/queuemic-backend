@@ -20,7 +20,7 @@ class JoinRoomAction
         $room = Room::where('code', $roomCode)->where('status', 'active')->first();
 
         if (!$room) {
-            throw new NotFoundHttpException('Room not found or has been closed.');
+            throw new NotFoundHttpException('Room not found or closed');
         }
 
         // Checked before the transaction: the throw below would otherwise roll back the room's closing

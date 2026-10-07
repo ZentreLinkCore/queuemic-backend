@@ -25,6 +25,8 @@ class MemberController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => $e->getMessage(),
+                'code' => 'MEMBERS_FETCH_FAILED',
+                'errors' => (object) [],
             ], 500);
         }
     }

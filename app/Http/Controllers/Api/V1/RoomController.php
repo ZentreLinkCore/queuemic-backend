@@ -37,6 +37,7 @@ class RoomController extends Controller
                 'success' => false,
                 'message' => $e->getMessage(),
                 'code' => 'ROOM_CREATION_FAILED',
+                'errors' => (object) [],
             ], 400);
         }
     }
@@ -58,18 +59,21 @@ class RoomController extends Controller
                 'success' => false,
                 'message' => $e->getMessage(),
                 'code' => 'ROOM_NOT_FOUND',
+                'errors' => (object) [],
             ], 404);
         } catch (\Symfony\Component\HttpKernel\Exception\UnprocessableEntityHttpException $e) {
             return response()->json([
                 'success' => false,
                 'message' => $e->getMessage(),
                 'code' => 'NICKNAME_TAKEN',
+                'errors' => (object) [],
             ], 422);
         } catch (Exception $e) {
             return response()->json([
                 'success' => false,
                 'message' => $e->getMessage(),
                 'code' => 'ROOM_JOIN_FAILED',
+                'errors' => (object) [],
             ], 400);
         }
     }
@@ -85,8 +89,9 @@ class RoomController extends Controller
             if (!$room) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Room not found or has been closed.',
+                    'message' => 'Room not found or closed',
                     'code' => 'ROOM_NOT_FOUND',
+                    'errors' => (object) [],
                 ], 404);
             }
 
@@ -98,6 +103,8 @@ class RoomController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => $e->getMessage(),
+                'code' => 'ROOM_FETCH_FAILED',
+                'errors' => (object) [],
             ], 500);
         }
     }
@@ -122,11 +129,26 @@ class RoomController extends Controller
                 'data' => $result,
                 'message' => 'Host transferred successfully.',
             ]);
+        } catch (\Symfony\Component\HttpKernel\Exception\NotFoundHttpException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+                'code' => 'MEMBER_NOT_FOUND',
+                'errors' => (object) [],
+            ], 404);
+        } catch (\Symfony\Component\HttpKernel\Exception\UnprocessableEntityHttpException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+                'code' => 'INVALID_TRANSFER_TARGET',
+                'errors' => (object) [],
+            ], 422);
         } catch (Exception $e) {
             return response()->json([
                 'success' => false,
                 'message' => $e->getMessage(),
                 'code' => 'TRANSFER_FAILED',
+                'errors' => (object) [],
             ], 400);
         }
     }
@@ -150,6 +172,8 @@ class RoomController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => $e->getMessage(),
+                'code' => 'LEAVE_FAILED',
+                'errors' => (object) [],
             ], 400);
         }
     }
@@ -178,6 +202,7 @@ class RoomController extends Controller
                 'success' => false,
                 'message' => $e->getMessage(),
                 'code' => 'SETTINGS_UPDATE_FAILED',
+                'errors' => (object) [],
             ], 400);
         }
     }
@@ -199,6 +224,8 @@ class RoomController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => $e->getMessage(),
+                'code' => 'CLOSE_FAILED',
+                'errors' => (object) [],
             ], 400);
         }
     }
