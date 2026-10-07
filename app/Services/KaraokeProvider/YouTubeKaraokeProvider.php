@@ -2,6 +2,7 @@
 
 namespace App\Services\KaraokeProvider;
 
+use Illuminate\Http\Client\Response;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -40,32 +41,63 @@ class YouTubeKaraokeProvider implements KaraokeProviderInterface
                 $searchTerm .= ' karaoke';
             }
 
-            $response = Http::timeout(8)->get('https://www.googleapis.com/youtube/v3/search', [
+            $response = $this->request('search', [
                 'part' => 'snippet',
                 'q' => $searchTerm,
                 'type' => 'video',
                 'videoEmbeddable' => 'true',
                 'maxResults' => $limit,
-                'key' => $this->apiKey,
             ]);
 
-            if ($response->successful()) {
-                $items = $response->json('items', []);
-                $durations = $this->fetchDurations(array_values(array_filter(
-                    array_map(fn ($item) => $item['id']['videoId'] ?? null, $items)
-                )));
-
-                return collect($items)->map(function ($item) use ($durations) {
-                    $id = $item['id']['videoId'] ?? '';
-
-                    return $this->toResult($id, $item['snippet'] ?? [], $durations[$id] ?? 0);
-                });
+            if (!$response->successful()) {
+                $this->logRejection('search', $response);
+                return collect();
             }
+
+            $items = $response->json('items', []);
+            $durations = $this->fetchDurations(array_values(array_filter(
+                array_map(fn ($item) => $item['id']['videoId'] ?? null, $items)
+            )));
+
+            return collect($items)->map(function ($item) use ($durations) {
+                $id = $item['id']['videoId'] ?? '';
+
+                return $this->toResult($id, $item['snippet'] ?? [], $durations[$id] ?? 0);
+            });
         } catch (\Exception $e) {
-            Log::warning('YouTube Data API search failed: ' . $e->getMessage());
+            $this->logException('search', $e);
         }
 
         return collect();
+    }
+
+    // The key travels in a header, never in the URL, so no error message or log line can echo it
+    protected function request(string $endpoint, array $query): Response
+    {
+        return Http::timeout(8)
+            ->withHeaders(['X-Goog-Api-Key' => $this->apiKey])
+            ->get('https://www.googleapis.com/youtube/v3/' . $endpoint, $query);
+    }
+
+    // Google explains a rejection in error.errors.0.reason (quotaExceeded, keyInvalid, badRequest, …)
+    protected function logRejection(string $call, Response $response): void
+    {
+        Log::warning("YouTube Data API {$call} rejected", [
+            'status' => $response->status(),
+            'reason' => $response->json('error.errors.0.reason'),
+            'message' => $this->redactKey((string) $response->json('error.message')),
+        ]);
+    }
+
+    protected function logException(string $call, \Throwable $e): void
+    {
+        Log::warning("YouTube Data API {$call} failed: " . $this->redactKey($e->getMessage()));
+    }
+
+    // Belt and braces: mask any key= that still appears in a message (e.g. a URL echoed by an HTTP error)
+    protected function redactKey(string $message): string
+    {
+        return preg_replace('/([?&]key=)[^&\s]+/i', '$1***', $message) ?? $message;
     }
 
     /**
@@ -82,13 +114,13 @@ class YouTubeKaraokeProvider implements KaraokeProviderInterface
         }
 
         try {
-            $response = Http::timeout(8)->get('https://www.googleapis.com/youtube/v3/videos', [
+            $response = $this->request('videos', [
                 'part' => 'contentDetails',
                 'id' => implode(',', $videoIds),
-                'key' => $this->apiKey,
             ]);
 
             if (!$response->successful()) {
+                $this->logRejection('video length lookup', $response);
                 return [];
             }
 
@@ -99,7 +131,7 @@ class YouTubeKaraokeProvider implements KaraokeProviderInterface
 
             return $durations;
         } catch (\Exception $e) {
-            Log::warning('YouTube video length lookup failed: ' . $e->getMessage());
+            $this->logException('video length lookup', $e);
         }
 
         return [];
@@ -149,13 +181,18 @@ class YouTubeKaraokeProvider implements KaraokeProviderInterface
         }
 
         try {
-            $response = Http::timeout(8)->get('https://www.googleapis.com/youtube/v3/videos', [
+            $response = $this->request('videos', [
                 'part' => 'snippet,contentDetails',
                 'id' => $externalVideoId,
-                'key' => $this->apiKey,
             ]);
-            $video = $response->successful() ? $response->json('items.0') : null;
 
+            if (!$response->successful()) {
+                $this->logRejection('video details lookup', $response);
+                return null;
+            }
+
+            // No such video is a normal answer, not a failure
+            $video = $response->json('items.0');
             if (!$video) {
                 return null;
             }
@@ -166,7 +203,7 @@ class YouTubeKaraokeProvider implements KaraokeProviderInterface
                 $this->parseDuration($video['contentDetails']['duration'] ?? null)
             );
         } catch (\Exception $e) {
-            Log::warning('YouTube video details lookup failed: ' . $e->getMessage());
+            $this->logException('video details lookup', $e);
         }
 
         return null;
