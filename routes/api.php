@@ -40,6 +40,8 @@ Route::prefix('v1')->group(function () {
         Route::get('/rooms/{code}', [RoomController::class, 'show']);
         Route::post('/rooms/{code}/leave', [RoomController::class, 'leave']);
         Route::get('/rooms/{code}/members', [MemberController::class, 'index']);
+        // Presence: the host seat's last_seen_at decides when an abandoned room closes
+        Route::post('/rooms/{code}/heartbeat', [MemberController::class, 'heartbeat']);
 
         // Queue Operations (Guest & Host)
         Route::get('/rooms/{code}/queue', [QueueController::class, 'index']);

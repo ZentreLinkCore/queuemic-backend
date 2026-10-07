@@ -18,12 +18,12 @@ return [
     | Cleanup (runs automatically at most every 5 minutes off API traffic; manual: php artisan rooms:cleanup)
     |--------------------------------------------------------------------------
     |
-    | room_idle_minutes: a room with no karaoke activity for this long (no song added, nothing playing)
+    | host_away_minutes: a room whose host has not been seen for this long (no heartbeat, no request)
     | is closed, then deleted together with its members, queue, playback and logs.
     | unused_song_days: cached YouTube songs no queue uses and no search has returned for this long.
     |
     */
-    'room_idle_minutes' => env('KARAOKE_ROOM_IDLE_MINUTES', 30),
+    'host_away_minutes' => env('KARAOKE_HOST_AWAY_MINUTES', 30),
 
     'unused_song_days' => env('KARAOKE_UNUSED_SONG_DAYS', 7),
 ];

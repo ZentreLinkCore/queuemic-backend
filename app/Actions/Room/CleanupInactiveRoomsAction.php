@@ -16,8 +16,8 @@ class CleanupInactiveRoomsAction
      */
     public static function execute(): array
     {
-        // Same idle rule the entry points use (join, every room request), so nothing disagrees about it
-        $idleCutoff = now()->subMinutes((int) config('karaoke.room_idle_minutes', 30));
+        // Same host-away rule the entry points use (join, every room request), so nothing disagrees about it
+        $idleCutoff = now()->subMinutes((int) config('karaoke.host_away_minutes', 30));
         $expiredRooms = Room::where('status', 'active')
             ->where('created_at', '<', $idleCutoff)
             ->get()

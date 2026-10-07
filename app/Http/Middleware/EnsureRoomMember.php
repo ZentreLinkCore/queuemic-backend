@@ -70,6 +70,11 @@ class EnsureRoomMember
             ], 403);
         }
 
+        // Any request counts as presence (host-away expiry reads the host seat); written at most once a minute
+        if (!$member->last_seen_at || $member->last_seen_at->lt(now()->subMinute())) {
+            $member->update(['last_seen_at' => now()]);
+        }
+
         // Attach resolved room and member to request attributes
         $request->attributes->set('room', $room);
         $request->attributes->set('member', $member);

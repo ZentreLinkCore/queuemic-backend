@@ -55,6 +55,20 @@ class QueueController extends Controller
                 'data' => $result,
                 'message' => 'Song added to queue.',
             ], 201);
+        } catch (\Symfony\Component\HttpKernel\Exception\ConflictHttpException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+                'code' => 'IDEMPOTENCY_KEY_MISMATCH',
+                'errors' => (object) [],
+            ], 409);
+        } catch (\Symfony\Component\HttpKernel\Exception\UnprocessableEntityHttpException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+                'code' => 'QUEUE_LIMIT_REACHED',
+                'errors' => (object) [],
+            ], 422);
         } catch (Exception $e) {
             return response()->json([
                 'success' => false,

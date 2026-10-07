@@ -23,22 +23,13 @@ class YouTubeKaraokeProvider implements KaraokeProviderInterface
             $query = 'Karaoke Hits';
         }
 
-        // 1. If Google API Key is provided, use official API
-        if (!empty($this->apiKey)) {
-            $apiResults = $this->searchViaApiKey($query, $limit);
-            if ($apiResults->isNotEmpty()) {
-                return $apiResults;
-            }
+        // Official YouTube Data API only (no scraping of youtube.com pages); without a key there is nothing to search
+        if (empty($this->apiKey)) {
+            Log::warning('YouTube search skipped: YOUTUBE_API_KEY is not set (use KARAOKE_PROVIDER_DRIVER=mock for offline development).');
+            return collect();
         }
 
-        // 2. Direct real-time YouTube scraper (Zero API Key required)
-        $publicResults = $this->searchPublic($query, $limit);
-        if (!empty($publicResults)) {
-            return collect($publicResults);
-        }
-
-        // 3. Return empty collection if no results found
-        return collect();
+        return $this->searchViaApiKey($query, $limit);
     }
 
     protected function searchViaApiKey(string $query, int $limit): Collection
@@ -66,24 +57,12 @@ class YouTubeKaraokeProvider implements KaraokeProviderInterface
 
                 return collect($items)->map(function ($item) use ($durations) {
                     $id = $item['id']['videoId'] ?? '';
-                    $title = $item['snippet']['title'] ?? 'Karaoke Track';
-                    $artist = $item['snippet']['channelTitle'] ?? 'Unknown Artist';
-                    $thumbnail = $item['snippet']['thumbnails']['high']['url'] ?? $item['snippet']['thumbnails']['default']['url'] ?? "https://img.youtube.com/vi/{$id}/hqdefault.jpg";
-                    $seconds = $durations[$id] ?? 0;
 
-                    return [
-                        'external_video_id' => $id,
-                        'title' => html_entity_decode($title, ENT_QUOTES | ENT_HTML5),
-                        'artist' => html_entity_decode($artist, ENT_QUOTES | ENT_HTML5),
-                        'duration_formatted' => $this->formatDuration($seconds),
-                        'duration_seconds' => $seconds,
-                        'thumbnail_url' => $thumbnail,
-                        'source_provider' => 'youtube',
-                    ];
+                    return $this->toResult($id, $item['snippet'] ?? [], $durations[$id] ?? 0);
                 });
             }
         } catch (\Exception $e) {
-            Log::warning('YouTube API Key search failed, falling back to public search: ' . $e->getMessage());
+            Log::warning('YouTube Data API search failed: ' . $e->getMessage());
         }
 
         return collect();
@@ -115,12 +94,7 @@ class YouTubeKaraokeProvider implements KaraokeProviderInterface
 
             $durations = [];
             foreach ($response->json('items', []) as $video) {
-                try {
-                    $interval = new \DateInterval($video['contentDetails']['duration'] ?? 'PT0S');
-                    $durations[$video['id']] = $interval->d * 86400 + $interval->h * 3600 + $interval->i * 60 + $interval->s;
-                } catch (\Exception) {
-                    // Unparseable length (e.g. an upcoming premiere): leave it unknown
-                }
+                $durations[$video['id']] = $this->parseDuration($video['contentDetails']['duration'] ?? null);
             }
 
             return $durations;
@@ -140,98 +114,61 @@ class YouTubeKaraokeProvider implements KaraokeProviderInterface
             : sprintf('%02d:%02d', intdiv($seconds, 60), $seconds % 60);
     }
 
-    protected function searchPublic(string $query, int $limit): array
+    // Seconds in an ISO-8601 length (PT4M13S); 0 — the "unknown" default — when it cannot be read (e.g. a premiere)
+    protected function parseDuration(?string $isoDuration): int
     {
         try {
-            $searchTerm = trim($query);
-            if (!str_contains(strtolower($searchTerm), 'karaoke') && !str_contains(strtolower($searchTerm), 'instrumental')) {
-                $searchTerm .= ' karaoke';
-            }
+            $interval = new \DateInterval($isoDuration ?: 'PT0S');
 
-            $url = 'https://www.youtube.com/results?search_query=' . urlencode($searchTerm);
-
-            $opts = [
-                'http' => [
-                    'method' => 'GET',
-                    'header' => "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36\r\nAccept-Language: en-US,en;q=0.9\r\n",
-                    'timeout' => 8,
-                ]
-            ];
-            $context = stream_context_create($opts);
-            $html = @file_get_contents($url, false, $context);
-
-            if (!$html) {
-                return [];
-            }
-
-            if (preg_match('/ytInitialData\s*=\s*({.+?});/s', $html, $matches)) {
-                $data = json_decode($matches[1], true);
-                $sections = $data['contents']['twoColumnSearchResultsRenderer']['primaryContents']['sectionListRenderer']['contents'] ?? [];
-
-                $results = [];
-                foreach ($sections as $section) {
-                    $items = $section['itemSectionRenderer']['contents'] ?? [];
-                    foreach ($items as $item) {
-                        if (isset($item['videoRenderer'])) {
-                            $v = $item['videoRenderer'];
-                            $videoId = $v['videoId'] ?? null;
-                            if (!$videoId) continue;
-
-                            $title = $v['title']['runs'][0]['text'] ?? 'Karaoke Track';
-                            $artist = $v['ownerText']['runs'][0]['text'] ?? 'YouTube';
-                            $duration = $v['lengthText']['simpleText'] ?? '03:45';
-                            $thumb = $v['thumbnail']['thumbnails'][0]['url'] ?? "https://img.youtube.com/vi/{$videoId}/hqdefault.jpg";
-
-                            // Convert duration string (e.g. 04:15) to seconds
-                            $parts = array_map('intval', explode(':', $duration));
-                            $seconds = 0;
-                            if (count($parts) === 2) {
-                                $seconds = $parts[0] * 60 + $parts[1];
-                            } elseif (count($parts) === 3) {
-                                $seconds = $parts[0] * 3600 + $parts[1] * 60 + $parts[2];
-                            } else {
-                                $seconds = 210;
-                            }
-
-                            $results[] = [
-                                'external_video_id' => $videoId,
-                                'title' => html_entity_decode($title, ENT_QUOTES | ENT_HTML5),
-                                'artist' => html_entity_decode($artist, ENT_QUOTES | ENT_HTML5),
-                                'duration_formatted' => $duration,
-                                'duration_seconds' => $seconds,
-                                'thumbnail_url' => $thumb,
-                                'source_provider' => 'youtube',
-                            ];
-
-                            if (count($results) >= $limit) {
-                                break 2;
-                            }
-                        }
-                    }
-                }
-
-                Log::info("🔍 [YouTube Public Search] Query: \"{$searchTerm}\" -> Found " . count($results) . " tracks");
-                return $results;
-            } else {
-                Log::warning("⚠️ [YouTube Public Search] Could not match ytInitialData payload for: \"{$searchTerm}\"");
-            }
-        } catch (\Exception $e) {
-            Log::error('❌ [YouTube Public Search Exception]: ' . $e->getMessage());
+            return $interval->d * 86400 + $interval->h * 3600 + $interval->i * 60 + $interval->s;
+        } catch (\Exception) {
+            return 0;
         }
-
-        return [];
     }
 
-    public function getDetails(string $externalVideoId): ?array
+    protected function toResult(string $videoId, array $snippet, int $seconds): array
     {
         return [
-            'external_video_id' => $externalVideoId,
-            'title' => 'Karaoke Track',
-            'artist' => 'YouTube',
-            'duration_formatted' => '03:45',
-            'duration_seconds' => 225,
-            'thumbnail_url' => "https://img.youtube.com/vi/{$externalVideoId}/hqdefault.jpg",
+            'external_video_id' => $videoId,
+            'title' => html_entity_decode($snippet['title'] ?? 'Karaoke Track', ENT_QUOTES | ENT_HTML5),
+            'artist' => html_entity_decode($snippet['channelTitle'] ?? 'Unknown Artist', ENT_QUOTES | ENT_HTML5),
+            'duration_formatted' => $this->formatDuration($seconds),
+            'duration_seconds' => $seconds,
+            'thumbnail_url' => $snippet['thumbnails']['high']['url'] ?? $snippet['thumbnails']['default']['url'] ?? "https://img.youtube.com/vi/{$videoId}/hqdefault.jpg",
             'source_provider' => 'youtube',
         ];
+    }
+
+    /**
+     * One video's metadata from the Data API, or null without a key or when the video does not exist.
+     */
+    public function getDetails(string $externalVideoId): ?array
+    {
+        if (empty($this->apiKey)) {
+            return null;
+        }
+
+        try {
+            $response = Http::timeout(8)->get('https://www.googleapis.com/youtube/v3/videos', [
+                'part' => 'snippet,contentDetails',
+                'id' => $externalVideoId,
+                'key' => $this->apiKey,
+            ]);
+            $video = $response->successful() ? $response->json('items.0') : null;
+
+            if (!$video) {
+                return null;
+            }
+
+            return $this->toResult(
+                $externalVideoId,
+                $video['snippet'] ?? [],
+                $this->parseDuration($video['contentDetails']['duration'] ?? null)
+            );
+        } catch (\Exception $e) {
+            Log::warning('YouTube video details lookup failed: ' . $e->getMessage());
+        }
+
+        return null;
     }
 }

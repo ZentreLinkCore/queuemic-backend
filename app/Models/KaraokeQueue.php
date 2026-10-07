@@ -16,6 +16,7 @@ class KaraokeQueue extends Model
         'room_id',
         'song_id',
         'requested_by_member_id',
+        'idempotency_key',
         'singer_name',
         'position',
         'status',
