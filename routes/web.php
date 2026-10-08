@@ -8,9 +8,3 @@ Route::get('/', function () {
 });
 
 Route::post('/broadcasting/auth', [BroadcastAuthController::class, 'authenticate']);
-
-Route::get('/test-broadcast', function () {
-    event(new \App\Events\TestMessage('Hello QueueMic'));
-
-    return 'Broadcast sent!';
-});
