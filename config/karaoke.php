@@ -26,4 +26,7 @@ return [
     'host_away_minutes' => env('KARAOKE_HOST_AWAY_MINUTES', 30),
 
     'unused_song_days' => env('KARAOKE_UNUSED_SONG_DAYS', 7),
+
+    // Unchanged host position reports inside this window are saved but not broadcast (Pusher bills per delivery)
+    'playback_broadcast_window_seconds' => env('KARAOKE_PLAYBACK_BROADCAST_WINDOW', 10),
 ];
