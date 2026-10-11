@@ -34,6 +34,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'room.host' => \App\Http\Middleware\EnsureRoomHost::class,
             'room.playback_control' => \App\Http\Middleware\EnsurePlaybackControl::class,
             'room.queue_reorder' => \App\Http\Middleware\EnsureQueueReorder::class,
+            'app.version' => \App\Http\Middleware\EnforceAppVersion::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
@@ -63,6 +64,7 @@ return Application::configure(basePath: dirname(__DIR__))
                 404 => 'NOT_FOUND',
                 405 => 'METHOD_NOT_ALLOWED',
                 422 => 'UNPROCESSABLE',
+                426 => 'UPDATE_REQUIRED',
                 429 => 'TOO_MANY_REQUESTS',
             ];
             $status = $e->getStatusCode();
