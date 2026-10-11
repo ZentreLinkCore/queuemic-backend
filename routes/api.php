@@ -7,7 +7,7 @@ use App\Http\Controllers\Api\V1\QueueController;
 use App\Http\Controllers\Api\V1\PlaybackController;
 use App\Http\Controllers\Api\V1\SongController;
 use App\Http\Controllers\Api\V1\MemberController;
-
+use App\Http\Controllers\Api\V1\AppVersionController;
 use App\Http\Controllers\Api\V1\BroadcastAuthController;
 
 /*
@@ -24,15 +24,20 @@ Route::prefix('v1')->group(function () {
     Route::get('/broadcasting/config', [BroadcastAuthController::class, 'config']);
     Route::post('/broadcasting/auth', [BroadcastAuthController::class, 'authenticate']);
 
-    // Public Room Operations
-    Route::post('/rooms', [RoomController::class, 'store']);
-    Route::post('/rooms/join', [RoomController::class, 'join']);
+    // Public App Version Check
+    Route::get('/app/version', [AppVersionController::class, 'show'])->name('api.v1.app.version');
+
+    // Public Room Operations. Room routes reject outdated app builds (426); the version check above stays open to them
+    Route::middleware(['app.version'])->group(function () {
+        Route::post('/rooms', [RoomController::class, 'store']);
+        Route::post('/rooms/join', [RoomController::class, 'join']);
+    });
 
     // Server clock for playback sync
     Route::get('/time', [PlaybackController::class, 'clock']);
 
     // Authenticated Room Member Group
-    Route::middleware(['room.member'])->group(function () {
+    Route::middleware(['app.version', 'room.member'])->group(function () {
         // Catalog Search (room is identified by the room_code query parameter)
         Route::get('/songs/search', [SongController::class, 'search'])->middleware('throttle:song-search');
 
