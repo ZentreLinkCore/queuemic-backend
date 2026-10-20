@@ -19,6 +19,10 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
+        // On Vercel every request reaches PHP from the runtime's local proxy (127.0.0.1); the client's IP
+        // and https scheme arrive in X-Forwarded-* headers, which Vercel's edge sets and overwrites
+        $middleware->trustProxies(at: '*');
+
         $middleware->validateCsrfTokens(except: [
             'broadcasting/auth',
             'api/*',
