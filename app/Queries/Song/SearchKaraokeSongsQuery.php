@@ -96,8 +96,8 @@ class SearchKaraokeSongsQuery
                 foreach ($terms as $term) {
                     $like = '%' . addcslashes($term, '%_\\') . '%';
                     $outer->where(function ($inner) use ($like) {
-                        $inner->where('title', 'like', $like)
-                            ->orWhere('artist', 'like', $like);
+                        $inner->whereRaw('LOWER(title) LIKE ?', [$like])
+                            ->orWhereRaw('LOWER(artist) LIKE ?', [$like]);
                     });
                 }
             });

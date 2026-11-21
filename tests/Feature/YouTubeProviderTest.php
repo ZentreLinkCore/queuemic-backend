@@ -9,6 +9,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Tests\TestCase;
@@ -150,10 +151,18 @@ class YouTubeProviderTest extends TestCase
         $this->assertSame('localVid1', $results->first()['external_video_id']);
         $this->assertTrue(YouTubeKaraokeProvider::isQuotaExhausted());
 
-        // Subsequent search uses local catalog directly without calling YouTube
-        $second = SearchKaraokeSongsQuery::execute('queen', 20);
+        // Subsequent search uses local catalog directly with case-insensitive LOWER(...) matching (PostgreSQL-safe)
+        DB::enableQueryLog();
+        $second = SearchKaraokeSongsQuery::execute('QuEeN', 20);
+        $queries = DB::getQueryLog();
+        DB::disableQueryLog();
+
         $this->assertCount(1, $second);
         $this->assertSame('localVid1', $second->first()['external_video_id']);
+        $this->assertNotEmpty($queries);
+        $this->assertStringContainsString('LOWER(title) LIKE ?', $queries[0]['query']);
+        $this->assertStringContainsString('LOWER(artist) LIKE ?', $queries[0]['query']);
+        $this->assertSame(['%queen%', '%queen%'], $queries[0]['bindings']);
         Http::assertSentCount(1);
     }
 }
