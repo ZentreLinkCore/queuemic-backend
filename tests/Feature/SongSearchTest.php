@@ -48,7 +48,7 @@ class SongSearchTest extends TestCase
         $sam = $this->joinRoom($room['code']);
         $url = "/api/v1/songs/search?q=queen&room_code={$room['code']}";
 
-        for ($i = 0; $i < 60; $i++) {
+        for ($i = 0; $i < 20; $i++) {
             $this->getJson($url, $this->headersFor($room['token']))->assertOk();
         }
 

@@ -28,7 +28,7 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('song-search', function (Request $request) {
             $token = $request->bearerToken() ?? $request->header('X-Session-Token');
 
-            return Limit::perMinute(60)->by($token ? hash('sha256', $token) : $request->ip());
+            return Limit::perMinute(20)->by($token ? hash('sha256', $token) : $request->ip());
         });
 
         Broadcast::resolveAuthenticatedUserUsing(function ($request) {

@@ -4,16 +4,24 @@ namespace App\Services\KaraokeProvider;
 
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
 class YouTubeKaraokeProvider implements KaraokeProviderInterface
 {
+    public const QUOTA_EXHAUSTED_CACHE_KEY = 'youtube_quota_exhausted';
+
     protected ?string $apiKey;
 
     public function __construct()
     {
         $this->apiKey = config('karaoke.youtube_api_key');
+    }
+
+    public static function isQuotaExhausted(): bool
+    {
+        return Cache::has(self::QUOTA_EXHAUSTED_CACHE_KEY);
     }
 
     public function search(string $query, int $limit = 20): Collection
@@ -27,6 +35,10 @@ class YouTubeKaraokeProvider implements KaraokeProviderInterface
         // Official YouTube Data API only (no scraping of youtube.com pages); without a key there is nothing to search
         if (empty($this->apiKey)) {
             Log::warning('YouTube search skipped: YOUTUBE_API_KEY is not set (use KARAOKE_PROVIDER_DRIVER=mock for offline development).');
+            return collect();
+        }
+
+        if (self::isQuotaExhausted()) {
             return collect();
         }
 
@@ -82,9 +94,16 @@ class YouTubeKaraokeProvider implements KaraokeProviderInterface
     // Google explains a rejection in error.errors.0.reason (quotaExceeded, keyInvalid, badRequest, …)
     protected function logRejection(string $call, Response $response): void
     {
+        $reason = $response->json('error.errors.0.reason');
+
+        if ($response->status() === 403 && in_array($reason, ['quotaExceeded', 'dailyLimitExceeded'], true)) {
+            $cooldown = max(1, (int) config('karaoke.quota_cooldown_minutes', 30));
+            Cache::put(self::QUOTA_EXHAUSTED_CACHE_KEY, true, now()->addMinutes($cooldown));
+        }
+
         Log::warning("YouTube Data API {$call} rejected", [
             'status' => $response->status(),
-            'reason' => $response->json('error.errors.0.reason'),
+            'reason' => $reason,
             'message' => $this->redactKey((string) $response->json('error.message')),
         ]);
     }
