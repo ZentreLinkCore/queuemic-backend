@@ -2,22 +2,30 @@
 
 namespace Tests\Feature;
 
+use App\Models\Song;
+use App\Queries\Song\SearchKaraokeSongsQuery;
 use App\Services\KaraokeProvider\YouTubeKaraokeProvider;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Request;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Tests\TestCase;
 
 class YouTubeProviderTest extends TestCase
 {
+    use RefreshDatabase;
+
     private const KEY = 'AIza-test-key-never-logged';
 
     protected function setUp(): void
     {
         parent::setUp();
+        Cache::flush();
         Http::preventStrayRequests();
-        config(['karaoke.youtube_api_key' => self::KEY]);
+        config(['karaoke.driver' => 'youtube', 'karaoke.youtube_api_key' => self::KEY]);
     }
 
     public function test_search_normalizes_results_with_real_lengths_and_sends_the_key_only_in_a_header(): void
@@ -83,5 +91,78 @@ class YouTubeProviderTest extends TestCase
 
         config(['karaoke.youtube_api_key' => null]);
         $this->assertNull((new YouTubeKaraokeProvider())->getDetails('vidZ'));
+    }
+
+    public function test_quota_exceeded_sets_circuit_breaker_and_short_circuits_further_calls(): void
+    {
+        Http::fake(['www.googleapis.com/*' => Http::response([
+            'error' => ['message' => 'Quota exceeded.', 'errors' => [['reason' => 'quotaExceeded']]],
+        ], 403)]);
+
+        $provider = new YouTubeKaraokeProvider();
+        $this->assertTrue($provider->search('bohemian rhapsody')->isEmpty());
+        $this->assertTrue(YouTubeKaraokeProvider::isQuotaExhausted());
+
+        // Second call must short-circuit without hitting YouTube again
+        $this->assertTrue($provider->search('hotel california')->isEmpty());
+        Http::assertSentCount(1);
+    }
+
+    public function test_search_query_canonicalizes_cache_key_for_equivalent_queries(): void
+    {
+        Http::fake([
+            'www.googleapis.com/youtube/v3/search*' => Http::response(['items' => [
+                ['id' => ['videoId' => 'vidMW'], 'snippet' => ['title' => 'My Way Karaoke', 'channelTitle' => 'SingKing']],
+            ]]),
+            'www.googleapis.com/youtube/v3/videos*' => Http::response(['items' => [
+                ['id' => 'vidMW', 'contentDetails' => ['duration' => 'PT4M35S']],
+            ]]),
+        ]);
+
+        $first = SearchKaraokeSongsQuery::execute('My Way', 20);
+        $second = SearchKaraokeSongsQuery::execute('  my   way   karaoke  ', 20);
+
+        $this->assertCount(1, $first);
+        $this->assertCount(1, $second);
+        $this->assertSame('vidMW', $second->first()['external_video_id']);
+        // Only one YouTube search + one videos duration lookup across both calls
+        Http::assertSentCount(2);
+    }
+
+    public function test_search_query_falls_back_to_local_songs_table_when_quota_is_exhausted(): void
+    {
+        Song::create([
+            'external_video_id' => 'localVid1',
+            'title' => 'Bohemian Rhapsody Karaoke',
+            'artist' => 'Queen',
+            'duration_formatted' => '05:55',
+            'duration_seconds' => 355,
+            'thumbnail_url' => 'https://img.youtube.com/vi/localVid1/hqdefault.jpg',
+            'source_provider' => 'youtube',
+        ]);
+
+        Http::fake(['www.googleapis.com/*' => Http::response([
+            'error' => ['message' => 'Quota exceeded.', 'errors' => [['reason' => 'quotaExceeded']]],
+        ], 403)]);
+
+        $results = SearchKaraokeSongsQuery::execute('bohemian', 20);
+
+        $this->assertCount(1, $results);
+        $this->assertSame('localVid1', $results->first()['external_video_id']);
+        $this->assertTrue(YouTubeKaraokeProvider::isQuotaExhausted());
+
+        // Subsequent search uses local catalog directly with case-insensitive LOWER(...) matching (PostgreSQL-safe)
+        DB::enableQueryLog();
+        $second = SearchKaraokeSongsQuery::execute('QuEeN', 20);
+        $queries = DB::getQueryLog();
+        DB::disableQueryLog();
+
+        $this->assertCount(1, $second);
+        $this->assertSame('localVid1', $second->first()['external_video_id']);
+        $this->assertNotEmpty($queries);
+        $this->assertStringContainsString('LOWER(title) LIKE ?', $queries[0]['query']);
+        $this->assertStringContainsString('LOWER(artist) LIKE ?', $queries[0]['query']);
+        $this->assertSame(['%queen%', '%queen%'], $queries[0]['bindings']);
+        Http::assertSentCount(1);
     }
 }

@@ -13,6 +13,11 @@ return [
 
     'youtube_api_key' => env('YOUTUBE_API_KEY', null),
 
+    // Cached YouTube search result pages (default 24h) and cooldown after a 403 quotaExceeded response
+    'search_cache_minutes' => (int) env('KARAOKE_SEARCH_CACHE_MINUTES', 1440),
+
+    'quota_cooldown_minutes' => (int) env('KARAOKE_QUOTA_COOLDOWN_MINUTES', 30),
+
     /*
     |--------------------------------------------------------------------------
     | Cleanup (runs automatically at most every 5 minutes off API traffic; manual: php artisan rooms:cleanup)
